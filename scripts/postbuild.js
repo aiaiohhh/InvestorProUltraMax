@@ -17,11 +17,19 @@ if (fs.existsSync(distDir)) {
 let adapterSuccess = false;
 
 try {
-  // Use npx to run the adapter without installing it
-  // The adapter will create the dist directory with proper structure
+  // Use npx to run adapter - it will use locally installed version if available
+  // Otherwise it will download it (with --yes flag)
   console.log('Running @cloudflare/next-on-pages adapter...');
   
-  // Try running the adapter - use explicit version and timeout
+  // Check if adapter is installed locally
+  const adapterPath = path.join(process.cwd(), 'node_modules', '@cloudflare', 'next-on-pages');
+  if (fs.existsSync(adapterPath)) {
+    console.log('Using locally installed adapter...');
+  } else {
+    console.log('Adapter not found locally, npx will download it...');
+  }
+  
+  // Try running the adapter - npx will use local version if available
   try {
     execSync('npx --yes @cloudflare/next-on-pages@1.13.16', {
       stdio: 'inherit',
