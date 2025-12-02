@@ -72,6 +72,9 @@ try {
       if (fs.existsSync(workerFile) || fs.existsSync(functionsDir)) {
         adapterSuccess = true;
         console.log('✓ Build output prepared for Cloudflare Pages by adapter');
+        
+        // Clean up large cache files that exceed Cloudflare's 25 MiB limit
+        cleanupLargeFiles(distDir);
       } else {
         console.warn('Adapter ran but did not create _worker.js or functions/');
         console.warn('Dist directory contents:', fs.readdirSync(distDir));
@@ -165,6 +168,54 @@ function copyRecursiveSync(src, dest) {
     });
   } else {
     fs.copyFileSync(src, dest);
+  }
+}
+
+// Clean up files that exceed Cloudflare's 25 MiB limit
+function cleanupLargeFiles(dir) {
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MiB in bytes
+  
+  // Directories to remove entirely (cache directories not needed for deployment)
+  const dirsToRemove = [
+    '.next/cache',
+    '.next/cache/webpack',
+    '.next/cache/webpack/edge-server-production',
+    '.next/cache/webpack/server-production',
+    '.next/cache/webpack/client-production',
+  ];
+  
+  for (const relPath of dirsToRemove) {
+    const fullPath = path.join(dir, relPath);
+    if (fs.existsSync(fullPath)) {
+      console.log(`Removing cache directory: ${relPath}`);
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+  
+  // Also scan for any remaining large files
+  scanAndRemoveLargeFiles(dir, MAX_FILE_SIZE);
+  
+  console.log('✓ Cleaned up large files for Cloudflare Pages deployment');
+}
+
+function scanAndRemoveLargeFiles(dir, maxSize, basePath = '') {
+  if (!fs.existsSync(dir)) return;
+  
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relativePath = path.join(basePath, entry.name);
+    
+    if (entry.isDirectory()) {
+      scanAndRemoveLargeFiles(fullPath, maxSize, relativePath);
+    } else if (entry.isFile()) {
+      const stats = fs.statSync(fullPath);
+      if (stats.size > maxSize) {
+        console.log(`Removing large file (${(stats.size / 1024 / 1024).toFixed(2)} MiB): ${relativePath}`);
+        fs.unlinkSync(fullPath);
+      }
+    }
   }
 }
 
