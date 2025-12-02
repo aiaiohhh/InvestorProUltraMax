@@ -271,7 +271,9 @@ export class CoinGeckoService {
       }));
 
       // Cache based on time range
-      const cacheTTL = days === 1 ? 60 * 1000 : days <= 7 ? 5 * 60 * 1000 : 30 * 60 * 1000;
+      const cacheTTL = typeof days === 'number' 
+        ? (days === 1 ? 60 * 1000 : days <= 7 ? 5 * 60 * 1000 : 30 * 60 * 1000)
+        : 30 * 60 * 1000; // Default for 'max'
       this.setCache(cacheKey, history, cacheTTL);
       return history;
     } catch (error) {

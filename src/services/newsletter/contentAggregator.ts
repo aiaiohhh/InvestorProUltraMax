@@ -665,7 +665,7 @@ export class ContentAggregatorService {
 
     for (const post of posts) {
       const text = post.title + ' ' + post.selftext;
-      const matches = text.matchAll(tickerPattern);
+      const matches = Array.from(text.matchAll(tickerPattern));
       for (const match of matches) {
         const ticker = match[1];
         tickerCounts.set(ticker, (tickerCounts.get(ticker) || 0) + 1);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { AssetDetail } from '@/components/research/AssetDetail';
@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 
 type FilterType = 'all' | 'stock' | 'crypto' | 'etf';
 
-export default function ResearchPage() {
+function ResearchContent() {
   const searchParams = useSearchParams();
   const initialAsset = searchParams.get('asset');
   
@@ -143,6 +143,23 @@ export default function ResearchPage() {
         </div>
       </motion.div>
     </MainLayout>
+  );
+}
+
+export default function ResearchPage() {
+  return (
+    <Suspense fallback={
+      <MainLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-white mb-1">Research</h1>
+            <p className="text-white/50">Loading...</p>
+          </div>
+        </div>
+      </MainLayout>
+    }>
+      <ResearchContent />
+    </Suspense>
   );
 }
 
