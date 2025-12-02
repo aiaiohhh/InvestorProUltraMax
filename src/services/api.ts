@@ -2,17 +2,26 @@
  * API Service Layer
  * 
  * This module provides a centralized API service for making requests to external data providers.
- * Currently configured for mock data, but structured for easy integration with real APIs.
+ * Integrates with multiple free data sources as per PRD plan.
  * 
- * Supported APIs (to be integrated):
- * - Alpha Vantage (Stocks)
+ * Integrated APIs:
+ * - Yahoo Finance (Primary stock data)
+ * - Alpha Vantage (Fundamentals & Technical)
  * - CoinGecko (Crypto)
- * - Polygon.io (Market data)
- * - Yahoo Finance (Alternative)
+ * - IEX Cloud (Real-time quotes)
+ * - Finnhub (News & Earnings)
+ * - SEC EDGAR (Filings)
+ * - FRED (Economic data)
  */
 
 import { Asset, PriceHistory, NewsItem, Fundamentals } from '@/types';
 import { mockAssets, mockNews, mockFundamentals, generatePriceHistory } from '@/data/mockData';
+
+// Import unified data service
+import { unifiedDataService } from './data';
+
+// Feature flag to switch between mock and real data
+const USE_REAL_DATA = process.env.NEXT_PUBLIC_USE_REAL_DATA === 'true';
 
 // API Configuration
 const config = {
@@ -65,12 +74,20 @@ export const assetService = {
    * Get all available assets
    */
   async getAll(): Promise<Asset[]> {
-    // TODO: Replace with real API call
-    // const stocks = await fetchWithRetry(`${config.alphaVantage.baseUrl}?function=...`);
-    // const crypto = await fetchWithRetry(`${config.coinGecko.baseUrl}/coins/markets?...`);
+    if (USE_REAL_DATA) {
+      try {
+        // Get top stocks and crypto from real APIs
+        const symbols = ['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META'];
+        const cryptoSymbols = ['BTC', 'ETH', 'SOL'];
+        const assets = await unifiedDataService.getAssets([...symbols, ...cryptoSymbols]);
+        return assets.length > 0 ? assets : mockAssets;
+      } catch (error) {
+        console.error('[API] Error fetching assets, falling back to mock:', error);
+        return mockAssets;
+      }
+    }
     
-    // For now, return mock data
-    await new Promise(resolve => setTimeout(resolve, 100)); // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 100));
     return mockAssets;
   },
 
@@ -78,6 +95,14 @@ export const assetService = {
    * Get a single asset by ID/symbol
    */
   async getById(id: string): Promise<Asset | null> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getAsset(id);
+      } catch (error) {
+        console.error(`[API] Error fetching asset ${id}, falling back to mock:`, error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 50));
     return mockAssets.find(a => a.id === id) || null;
   },
@@ -86,6 +111,19 @@ export const assetService = {
    * Search assets by query
    */
   async search(query: string): Promise<Asset[]> {
+    if (USE_REAL_DATA) {
+      try {
+        const results = await unifiedDataService.search(query);
+        // Convert search results to Asset format
+        const assets = await Promise.all(
+          results.slice(0, 10).map(r => unifiedDataService.getAsset(r.symbol))
+        );
+        return assets.filter((a): a is Asset => a !== null);
+      } catch (error) {
+        console.error(`[API] Error searching for ${query}, falling back to mock:`, error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 50));
     const lowerQuery = query.toLowerCase();
     return mockAssets.filter(
@@ -96,11 +134,23 @@ export const assetService = {
 
   /**
    * Get real-time quote for an asset
-   * 
-   * Alpha Vantage example:
-   * GET https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey=demo
    */
   async getQuote(symbol: string): Promise<{ price: number; change: number; changePercent: number } | null> {
+    if (USE_REAL_DATA) {
+      try {
+        const asset = await unifiedDataService.getAsset(symbol);
+        if (asset) {
+          return {
+            price: asset.price,
+            change: asset.change24h,
+            changePercent: asset.changePercent24h,
+          };
+        }
+      } catch (error) {
+        console.error(`[API] Error fetching quote for ${symbol}:`, error);
+      }
+    }
+    
     const asset = mockAssets.find(a => a.symbol === symbol);
     if (!asset) return null;
     
@@ -116,18 +166,21 @@ export const assetService = {
 export const priceService = {
   /**
    * Get historical price data
-   * 
-   * Alpha Vantage example:
-   * GET https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=IBM&apikey=demo
-   * 
-   * CoinGecko example:
-   * GET https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=30
    */
   async getHistory(
     assetId: string,
     days: number = 90,
     interval: 'daily' | 'hourly' | 'minute' = 'daily'
   ): Promise<PriceHistory[]> {
+    if (USE_REAL_DATA) {
+      try {
+        const range = days <= 5 ? '5d' : days <= 30 ? '1mo' : days <= 90 ? '3mo' : days <= 180 ? '6mo' : '1y';
+        return await unifiedDataService.getPriceHistory(assetId, range as any);
+      } catch (error) {
+        console.error(`[API] Error fetching price history for ${assetId}:`, error);
+      }
+    }
+    
     const asset = mockAssets.find(a => a.id === assetId);
     if (!asset) return [];
     
@@ -147,11 +200,16 @@ export const priceService = {
 export const fundamentalsService = {
   /**
    * Get company fundamentals
-   * 
-   * Alpha Vantage example:
-   * GET https://www.alphavantage.co/query?function=OVERVIEW&symbol=IBM&apikey=demo
    */
   async getByAssetId(assetId: string): Promise<Fundamentals | null> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getFundamentals(assetId);
+      } catch (error) {
+        console.error(`[API] Error fetching fundamentals for ${assetId}:`, error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 50));
     return mockFundamentals[assetId] || null;
   },
@@ -160,7 +218,18 @@ export const fundamentalsService = {
    * Get financial statements
    */
   async getFinancials(assetId: string, type: 'income' | 'balance' | 'cashflow') {
-    // TODO: Implement with real API
+    if (USE_REAL_DATA) {
+      try {
+        const statements = await unifiedDataService.getFinancialStatements(assetId);
+        switch (type) {
+          case 'income': return statements.incomeStatements;
+          case 'balance': return statements.balanceSheets;
+          case 'cashflow': return statements.cashFlowStatements;
+        }
+      } catch (error) {
+        console.error(`[API] Error fetching financials for ${assetId}:`, error);
+      }
+    }
     return null;
   },
 };
@@ -169,11 +238,16 @@ export const fundamentalsService = {
 export const newsService = {
   /**
    * Get market news
-   * 
-   * Alpha Vantage example:
-   * GET https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=AAPL&apikey=demo
    */
   async getLatest(limit: number = 10): Promise<NewsItem[]> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getNews({ limit });
+      } catch (error) {
+        console.error('[API] Error fetching news:', error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 100));
     return mockNews.slice(0, limit);
   },
@@ -182,6 +256,14 @@ export const newsService = {
    * Get news for specific asset
    */
   async getByAsset(assetId: string, limit: number = 5): Promise<NewsItem[]> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getCompanyNews(assetId, limit);
+      } catch (error) {
+        console.error(`[API] Error fetching news for ${assetId}:`, error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 50));
     return mockNews.filter(n => n.relatedAssets?.includes(assetId)).slice(0, limit);
   },
@@ -192,6 +274,20 @@ export const newsService = {
   async getWithSentiment(query: string): Promise<NewsItem[]> {
     return this.getLatest(20);
   },
+  
+  /**
+   * Get crypto news
+   */
+  async getCryptoNews(limit: number = 10): Promise<NewsItem[]> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getCryptoNews(limit);
+      } catch (error) {
+        console.error('[API] Error fetching crypto news:', error);
+      }
+    }
+    return mockNews.filter(n => n.relatedAssets?.some(a => ['BTC', 'ETH', 'SOL'].includes(a))).slice(0, limit);
+  },
 };
 
 // Market Data Services
@@ -200,6 +296,19 @@ export const marketService = {
    * Get market indices
    */
   async getIndices(): Promise<{ name: string; value: number; change: number }[]> {
+    if (USE_REAL_DATA) {
+      try {
+        const indices = await unifiedDataService.getMarketIndices();
+        return indices.map(i => ({
+          name: i.name,
+          value: i.value,
+          change: i.changePercent,
+        }));
+      } catch (error) {
+        console.error('[API] Error fetching market indices:', error);
+      }
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 50));
     return [
       { name: 'S&P 500', value: 4780.94, change: 0.52 },
@@ -225,6 +334,66 @@ export const marketService = {
       market: 'US',
       status: isWeekday && isMarketHours ? 'open' : 'closed',
     };
+  },
+  
+  /**
+   * Get top movers
+   */
+  async getTopMovers(): Promise<{ gainers: any[]; losers: any[]; mostActive: any[] }> {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getMarketMovers();
+      } catch (error) {
+        console.error('[API] Error fetching market movers:', error);
+      }
+    }
+    return { gainers: [], losers: [], mostActive: [] };
+  },
+  
+  /**
+   * Get sector performance
+   */
+  async getSectorPerformance(): Promise<Array<{ name: string; performance: number }>> {
+    if (USE_REAL_DATA) {
+      try {
+        const sectors = await unifiedDataService.getSectorPerformance();
+        return sectors.map(s => ({
+          name: s.name,
+          performance: s.performance * 100,
+        }));
+      } catch (error) {
+        console.error('[API] Error fetching sector performance:', error);
+      }
+    }
+    return [];
+  },
+  
+  /**
+   * Get economic indicators
+   */
+  async getEconomicIndicators() {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getEconomicIndicators();
+      } catch (error) {
+        console.error('[API] Error fetching economic indicators:', error);
+      }
+    }
+    return null;
+  },
+  
+  /**
+   * Get earnings calendar
+   */
+  async getEarningsCalendar(from?: string, to?: string) {
+    if (USE_REAL_DATA) {
+      try {
+        return await unifiedDataService.getEarningsCalendar(from, to);
+      } catch (error) {
+        console.error('[API] Error fetching earnings calendar:', error);
+      }
+    }
+    return [];
   },
 };
 

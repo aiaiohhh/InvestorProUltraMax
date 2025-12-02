@@ -150,6 +150,21 @@ NEXTAUTH_SECRET=your_secret
 
 MIT License - feel free to use this project for learning or as a starting point for your own investment platform.
 
+## Planning & Documentation
+
+Comprehensive planning documents and PRDs are available in `~/docs`:
+
+- **Product Roadmap** (`~/docs/ROADMAP.md`) - Complete product roadmap with all phases and features
+- **PRD Plan** (`~/docs/PRD_PLAN.md`) - Detailed phased PRD plan focusing on free resources and newsletter automation
+- **PRD Index** (`~/docs/PRD_INDEX.md`) - Quick reference index for all PRDs
+- **PRD Summary** (`~/docs/PRD_SUMMARY.md`) - Quick start guide and executive summary
+- **Documentation README** (`~/docs/README.md`) - Guide to all documentation
+
+### Strategic Focus Areas
+
+1. **Free Resource Integration**: Maximizing use of free/public APIs (11+ sources, $0/month cost)
+2. **Newsletter Automation**: Daily personalized newsletters as core Pro tier value driver
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
