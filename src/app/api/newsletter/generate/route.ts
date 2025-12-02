@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { newsletterGeneratorService, UserPreferences } from '@/services/newsletter';
 import { subscriptionManagerService } from '@/services/subscription';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

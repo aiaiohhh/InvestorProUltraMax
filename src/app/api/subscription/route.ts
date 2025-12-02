@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { subscriptionManagerService, SUBSCRIPTION_PLANS, SubscriptionTier } from '@/services/subscription';
 
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {

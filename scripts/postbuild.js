@@ -29,14 +29,40 @@ try {
     console.log('Adapter not found locally, npx will download it...');
   }
   
-  // Try running the adapter - npx will use local version if available
+  // Try running the adapter - first try local install, then npx
+  let adapterCommand = null;
+  
+  // Check if adapter CLI exists locally
+  const adapterCliPath = path.join(process.cwd(), 'node_modules', '@cloudflare', 'next-on-pages', 'dist', 'cli', 'index.js');
+  if (fs.existsSync(adapterCliPath)) {
+    adapterCommand = `node "${adapterCliPath}"`;
+    console.log('Using locally installed adapter CLI...');
+  } else {
+    // Try to find the binary
+    const adapterBinPath = path.join(process.cwd(), 'node_modules', '.bin', 'next-on-pages');
+    if (fs.existsSync(adapterBinPath)) {
+      adapterCommand = adapterBinPath;
+      console.log('Using locally installed adapter binary...');
+    } else {
+      // Fall back to npx
+      adapterCommand = 'npx --yes @cloudflare/next-on-pages@1.13.16';
+      console.log('Using npx to run adapter...');
+    }
+  }
+  
   try {
-    execSync('npx --yes @cloudflare/next-on-pages@1.13.16', {
-      stdio: 'inherit',
+    // Run adapter with output capture to see what's happening
+    console.log(`Executing: ${adapterCommand}`);
+    const adapterOutput = execSync(adapterCommand, {
+      encoding: 'utf8',
       cwd: process.cwd(),
       env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' },
       timeout: 300000 // 5 minute timeout
     });
+    
+    if (adapterOutput) {
+      console.log('Adapter output:', adapterOutput);
+    }
     
     // Verify dist was created and has required files
     if (fs.existsSync(distDir)) {
@@ -48,10 +74,16 @@ try {
         console.log('✓ Build output prepared for Cloudflare Pages by adapter');
       } else {
         console.warn('Adapter ran but did not create _worker.js or functions/');
+        console.warn('Dist directory contents:', fs.readdirSync(distDir));
       }
+    } else {
+      console.warn('Adapter ran but did not create dist directory');
     }
   } catch (adapterError) {
-    console.warn('Adapter execution failed:', adapterError.message);
+    console.warn('Adapter execution failed');
+    console.warn('Error:', adapterError.message);
+    if (adapterError.stdout) console.warn('Stdout:', adapterError.stdout);
+    if (adapterError.stderr) console.warn('Stderr:', adapterError.stderr);
   }
 } catch (error) {
   console.warn('Adapter setup failed:', error.message);
