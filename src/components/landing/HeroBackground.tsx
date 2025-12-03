@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 
+type CandleSizeVariant = 'compact' | 'balanced' | 'tower';
+
 interface Candle {
   x: number;
   y: number;
@@ -18,6 +20,9 @@ interface Candle {
   baseScale: number;
   isHovered: boolean;
   hoverProgress: number;
+  sizeVariant: CandleSizeVariant;
+  profitValue: number;
+  profitLabel: string;
 }
 
 interface Particle {
@@ -38,6 +43,54 @@ interface DataPoint {
   speed: number;
   isPositive: boolean;
 }
+
+const candleSizeProfiles: Record<
+  CandleSizeVariant,
+  {
+    width: [number, number];
+    body: [number, number];
+    wickTop: [number, number];
+    wickBottom: [number, number];
+    scale: [number, number];
+    pnl: [number, number];
+    speed: [number, number];
+  }
+> = {
+  compact: {
+    width: [4, 8],
+    body: [18, 40],
+    wickTop: [8, 16],
+    wickBottom: [8, 18],
+    scale: [0.4, 0.6],
+    pnl: [0.6, 2.2],
+    speed: [0.8, 1.5],
+  },
+  balanced: {
+    width: [7, 12],
+    body: [45, 85],
+    wickTop: [12, 26],
+    wickBottom: [12, 24],
+    scale: [0.65, 0.9],
+    pnl: [2, 5.5],
+    speed: [0.55, 1.1],
+  },
+  tower: {
+    width: [10, 16],
+    body: [90, 150],
+    wickTop: [20, 38],
+    wickBottom: [20, 34],
+    scale: [0.9, 1.25],
+    pnl: [4.5, 9.5],
+    speed: [0.35, 0.85],
+  },
+};
+
+const candleVariants = Object.keys(candleSizeProfiles) as CandleSizeVariant[];
+
+const randomRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+const formatProfitLabel = (value: number) =>
+  `${value >= 0 ? '+' : '-'}$${Math.abs(value).toFixed(1)}k`;
 
 export function HeroBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,18 +129,23 @@ export function HeroBackground() {
 
     // Initialize candlesticks
     const createCandle = (isGreen: boolean, startY?: number): Candle => {
-      const baseSpeed = Math.random() * 1.2 + 0.5;
+      const sizeVariant = candleVariants[Math.floor(Math.random() * candleVariants.length)];
+      const profile = candleSizeProfiles[sizeVariant];
+      const baseSpeed = randomRange(profile.speed[0], profile.speed[1]);
       const baseOpacity = Math.random() * 0.25 + 0.08;
-      const baseScale = Math.random() * 0.4 + 0.4;
+      const baseScale = randomRange(profile.scale[0], profile.scale[1]);
+      const profitMagnitude = randomRange(profile.pnl[0], profile.pnl[1]);
+      const signedProfit = (isGreen ? 1 : -1) * profitMagnitude;
+
       return {
         x: Math.random() * canvas.width,
         y: startY !== undefined ? startY : Math.random() * canvas.height,
         vy: isGreen ? -baseSpeed : baseSpeed,
         baseVy: isGreen ? -baseSpeed : baseSpeed,
-        width: Math.random() * 12 + 6,
-        bodyHeight: Math.random() * 50 + 25,
-        wickTop: Math.random() * 20 + 8,
-        wickBottom: Math.random() * 20 + 8,
+        width: randomRange(profile.width[0], profile.width[1]),
+        bodyHeight: randomRange(profile.body[0], profile.body[1]),
+        wickTop: randomRange(profile.wickTop[0], profile.wickTop[1]),
+        wickBottom: randomRange(profile.wickBottom[0], profile.wickBottom[1]),
         opacity: baseOpacity,
         baseOpacity,
         isGreen,
@@ -95,7 +153,15 @@ export function HeroBackground() {
         baseScale,
         isHovered: false,
         hoverProgress: 0,
+        sizeVariant,
+        profitValue: signedProfit,
+        profitLabel: formatProfitLabel(signedProfit),
       };
+    };
+
+    const resetCandle = (candle: Candle, startY: number) => {
+      const freshCandle = createCandle(candle.isGreen, startY);
+      Object.assign(candle, freshCandle);
     };
 
     // Create initial candles - fewer candles for cleaner look
@@ -290,25 +356,80 @@ export function HeroBackground() {
           );
         }
 
+        // Tooltip with profit/loss details
+        if (candle.hoverProgress > 0.05) {
+          ctx.font = '600 12px "Inter", "SF Pro Display", sans-serif';
+          const tooltipPaddingX = 10;
+          const tooltipHeight = 26;
+          const textMetrics = ctx.measureText(candle.profitLabel);
+          const tooltipWidth = textMetrics.width + tooltipPaddingX * 2;
+          let tooltipX = candle.x - tooltipWidth / 2;
+          tooltipX = Math.max(16, Math.min(tooltipX, canvas.width - tooltipWidth - 16));
+          const tooltipDirection = candle.isGreen ? -1 : 1;
+          let tooltipY =
+            tooltipDirection === -1
+              ? candle.y - finalWickTop - tooltipHeight - 14
+              : candle.y + finalBodyHeight + finalWickBottom + 14;
+          tooltipY = Math.max(12, Math.min(tooltipY, canvas.height - tooltipHeight - 12));
+          const accentColor = candle.isGreen
+            ? `rgba(74, 222, 128, ${0.55 + candle.hoverProgress * 0.4})`
+            : `rgba(248, 113, 113, ${0.55 + candle.hoverProgress * 0.4})`;
+
+          ctx.fillStyle = `rgba(8, 10, 16, ${0.65 + candle.hoverProgress * 0.3})`;
+          ctx.beginPath();
+          ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
+          ctx.fill();
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillText(
+            candle.profitLabel,
+            tooltipX + tooltipWidth / 2 - textMetrics.width / 2,
+            tooltipY + tooltipHeight / 2 + 4
+          );
+
+          const pointerWidth = 12;
+          const pointerHeight = 7;
+          const pointerBaseX = Math.min(
+            Math.max(candle.x, tooltipX + 8),
+            tooltipX + tooltipWidth - 8
+          );
+          ctx.beginPath();
+          if (tooltipDirection === -1) {
+            ctx.moveTo(pointerBaseX, tooltipY + tooltipHeight);
+            ctx.lineTo(
+              pointerBaseX - pointerWidth / 2,
+              tooltipY + tooltipHeight + pointerHeight
+            );
+            ctx.lineTo(
+              pointerBaseX + pointerWidth / 2,
+              tooltipY + tooltipHeight + pointerHeight
+            );
+          } else {
+            ctx.moveTo(pointerBaseX, tooltipY);
+            ctx.lineTo(pointerBaseX - pointerWidth / 2, tooltipY - pointerHeight);
+            ctx.lineTo(pointerBaseX + pointerWidth / 2, tooltipY - pointerHeight);
+          }
+          ctx.closePath();
+          ctx.fillStyle = `rgba(8, 10, 16, ${0.65 + candle.hoverProgress * 0.3})`;
+          ctx.fill();
+          ctx.strokeStyle = accentColor;
+          ctx.stroke();
+        }
+
         // Update position
         candle.y += candle.vy;
 
         // Reset candles when they go off screen
         if (candle.isGreen) {
           if (candle.y + finalBodyHeight + finalWickBottom < -50) {
-            candle.y = canvas.height + 100;
-            candle.x = Math.random() * canvas.width;
-            candle.baseOpacity = Math.random() * 0.25 + 0.08;
-            candle.baseScale = Math.random() * 0.4 + 0.4;
-            candle.hoverProgress = 0;
+            resetCandle(candle, canvas.height + 100);
           }
         } else {
           if (candle.y - finalWickTop > canvas.height + 50) {
-            candle.y = -100 - finalBodyHeight;
-            candle.x = Math.random() * canvas.width;
-            candle.baseOpacity = Math.random() * 0.25 + 0.08;
-            candle.baseScale = Math.random() * 0.4 + 0.4;
-            candle.hoverProgress = 0;
+            resetCandle(candle, -100 - finalBodyHeight);
           }
         }
       });

@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: 'InvestorPro UltraMax | Professional Investment Platform',
   description: 'Track your investments, research assets, and manage your portfolio with real-time data and powerful analytics.',
   keywords: ['investment', 'portfolio', 'stocks', 'crypto', 'ETF', 'trading', 'finance'],
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

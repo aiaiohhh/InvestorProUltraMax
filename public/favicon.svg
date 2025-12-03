@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="InvestorPro UltraMax favicon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1f2937" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)" />
+  <path fill="#f8fafc" d="M64 64h32v128H64z" />
+  <path
+    fill="#f8fafc"
+    d="M122 64h58c40 0 66 22 66 58s-26 58-66 58h-58zm32 32v52h22c23 0 36-11 36-26s-13-26-36-26z"
+  />
+  <path
+    d="M52 176l46-40 30 26 68-74 40 36"
+    fill="none"
+    stroke="#38bdf8"
+    stroke-width="16"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
+
