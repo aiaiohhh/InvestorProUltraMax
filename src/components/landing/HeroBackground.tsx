@@ -44,6 +44,33 @@ interface DataPoint {
   isPositive: boolean;
 }
 
+interface ChartOverlay {
+  type: 'line' | 'bar' | 'area';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  data: number[];
+  opacity: number;
+  baseOpacity: number;
+  color: string;
+  pulsePhase: number;
+  isHovered: boolean;
+  hoverProgress: number;
+  label: string;
+}
+
+interface DataTable {
+  x: number;
+  y: number;
+  rows: Array<{ label: string; value: string; change: number }>;
+  opacity: number;
+  baseOpacity: number;
+  drift: { x: number; y: number };
+  isHovered: boolean;
+  hoverProgress: number;
+}
+
 const candleSizeProfiles: Record<
   CandleSizeVariant,
   {
@@ -126,6 +153,8 @@ export function HeroBackground() {
     const candles: Candle[] = [];
     const particles: Particle[] = [];
     const dataPoints: DataPoint[] = [];
+    const chartOverlays: ChartOverlay[] = [];
+    const dataTables: DataTable[] = [];
 
     // Initialize candlesticks
     const createCandle = (isGreen: boolean, startY?: number): Candle => {
@@ -218,6 +247,103 @@ export function HeroBackground() {
       });
     }
 
+    // Initialize chart overlays - positioned in corners and edges
+    const generateChartData = (points: number) => 
+      Array.from({ length: points }, () => Math.random());
+
+    const chartConfigs = [
+      // Top-left: Line chart (long-term growth)
+      { 
+        type: 'line' as const, 
+        x: 60, 
+        y: 140, 
+        width: 220, 
+        height: 120, 
+        color: '74, 222, 128',
+        label: 'Portfolio Growth'
+      },
+      // Bottom-left: Bar chart (volume/allocation)
+      { 
+        type: 'bar' as const, 
+        x: 50, 
+        y: canvas.height - 240, 
+        width: 180, 
+        height: 140, 
+        color: '96, 165, 250',
+        label: 'Asset Allocation'
+      },
+      // Top-right: Area chart (cumulative returns)
+      { 
+        type: 'area' as const, 
+        x: canvas.width - 270, 
+        y: 160, 
+        width: 200, 
+        height: 100, 
+        color: '168, 85, 247',
+        label: 'Cumulative Returns'
+      },
+      // Bottom-right: Line chart (volatility)
+      { 
+        type: 'line' as const, 
+        x: canvas.width - 240, 
+        y: canvas.height - 220, 
+        width: 190, 
+        height: 110, 
+        color: '249, 115, 22',
+        label: 'Risk Analysis'
+      },
+    ];
+
+    chartConfigs.forEach((config) => {
+      const baseOpacity = 0.15;
+      chartOverlays.push({
+        ...config,
+        data: generateChartData(config.type === 'bar' ? 8 : 20),
+        opacity: baseOpacity,
+        baseOpacity,
+        pulsePhase: Math.random() * Math.PI * 2,
+        isHovered: false,
+        hoverProgress: 0,
+      });
+    });
+
+    // Initialize data tables
+    const tableData = [
+      // Top-center-right
+      {
+        x: canvas.width - 420,
+        y: 140,
+        rows: [
+          { label: 'S&P 500', value: '4,783.45', change: 1.2 },
+          { label: 'NASDAQ', value: '15,149.68', change: 2.1 },
+          { label: 'DOW', value: '37,545.33', change: 0.8 },
+          { label: 'VIX', value: '13.42', change: -3.5 },
+        ],
+      },
+      // Middle-right
+      {
+        x: canvas.width - 380,
+        y: canvas.height * 0.5,
+        rows: [
+          { label: 'BTC', value: '$67,234', change: 5.4 },
+          { label: 'ETH', value: '$3,456', change: 3.2 },
+          { label: 'Gold', value: '$2,045', change: -0.5 },
+        ],
+      },
+    ];
+
+    tableData.forEach((config) => {
+      const baseOpacity = 0.12;
+      dataTables.push({
+        ...config,
+        opacity: baseOpacity,
+        baseOpacity,
+        drift: { x: 0, y: 0 },
+        isHovered: false,
+        hoverProgress: 0,
+      });
+    });
+
     // Animation loop
     const animate = () => {
       // Clear with solid color for cleaner look (no trails)
@@ -240,6 +366,197 @@ export function HeroBackground() {
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
       }
+
+      // Draw and update chart overlays
+      chartOverlays.forEach((chart) => {
+        // Check hover
+        chart.isHovered =
+          mouseRef.current.x >= chart.x &&
+          mouseRef.current.x <= chart.x + chart.width &&
+          mouseRef.current.y >= chart.y &&
+          mouseRef.current.y <= chart.y + chart.height;
+
+        // Smooth hover transition
+        if (chart.isHovered) {
+          chart.hoverProgress = Math.min(1, chart.hoverProgress + 0.06);
+        } else {
+          chart.hoverProgress = Math.max(0, chart.hoverProgress - 0.04);
+        }
+
+        // Pulsing animation
+        chart.pulsePhase += 0.015;
+        const pulse = Math.sin(chart.pulsePhase) * 0.03;
+        chart.opacity = chart.baseOpacity + pulse + chart.hoverProgress * 0.15;
+
+        // Draw background panel
+        ctx.fillStyle = `rgba(15, 20, 30, ${chart.opacity * 2})`;
+        ctx.beginPath();
+        ctx.roundRect(chart.x - 12, chart.y - 12, chart.width + 24, chart.height + 24, 12);
+        ctx.fill();
+
+        // Draw border
+        ctx.strokeStyle = `rgba(${chart.color}, ${chart.opacity * 1.5 + chart.hoverProgress * 0.3})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Draw label
+        if (chart.hoverProgress > 0.1) {
+          ctx.font = '600 10px "Inter", sans-serif';
+          ctx.fillStyle = `rgba(${chart.color}, ${0.6 + chart.hoverProgress * 0.4})`;
+          ctx.fillText(chart.label, chart.x, chart.y - 18);
+        }
+
+        // Draw chart based on type
+        ctx.save();
+        ctx.globalAlpha = chart.opacity + chart.hoverProgress * 0.2;
+
+        if (chart.type === 'line') {
+          // Line chart
+          ctx.beginPath();
+          chart.data.forEach((value, i) => {
+            const x = chart.x + (i / (chart.data.length - 1)) * chart.width;
+            const y = chart.y + chart.height - value * chart.height * 0.9;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = `rgba(${chart.color}, ${0.8 + chart.hoverProgress * 0.2})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Draw dots on hover
+          if (chart.hoverProgress > 0.3) {
+            chart.data.forEach((value, i) => {
+              const x = chart.x + (i / (chart.data.length - 1)) * chart.width;
+              const y = chart.y + chart.height - value * chart.height * 0.9;
+              ctx.beginPath();
+              ctx.arc(x, y, 2, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${chart.color}, ${chart.hoverProgress})`;
+              ctx.fill();
+            });
+          }
+        } else if (chart.type === 'bar') {
+          // Bar chart
+          const barWidth = chart.width / chart.data.length * 0.7;
+          const gap = chart.width / chart.data.length * 0.3;
+          chart.data.forEach((value, i) => {
+            const x = chart.x + i * (barWidth + gap);
+            const barHeight = value * chart.height * 0.9;
+            const y = chart.y + chart.height - barHeight;
+            
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            gradient.addColorStop(0, `rgba(${chart.color}, ${0.9 + chart.hoverProgress * 0.1})`);
+            gradient.addColorStop(1, `rgba(${chart.color}, ${0.4 + chart.hoverProgress * 0.2})`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, barWidth, barHeight);
+          });
+        } else if (chart.type === 'area') {
+          // Area chart
+          ctx.beginPath();
+          ctx.moveTo(chart.x, chart.y + chart.height);
+          chart.data.forEach((value, i) => {
+            const x = chart.x + (i / (chart.data.length - 1)) * chart.width;
+            const y = chart.y + chart.height - value * chart.height * 0.9;
+            ctx.lineTo(x, y);
+          });
+          ctx.lineTo(chart.x + chart.width, chart.y + chart.height);
+          ctx.closePath();
+
+          // Gradient fill
+          const gradient = ctx.createLinearGradient(
+            chart.x,
+            chart.y,
+            chart.x,
+            chart.y + chart.height
+          );
+          gradient.addColorStop(0, `rgba(${chart.color}, ${0.5 + chart.hoverProgress * 0.2})`);
+          gradient.addColorStop(1, `rgba(${chart.color}, 0.05)`);
+          ctx.fillStyle = gradient;
+          ctx.fill();
+
+          // Top line
+          ctx.beginPath();
+          chart.data.forEach((value, i) => {
+            const x = chart.x + (i / (chart.data.length - 1)) * chart.width;
+            const y = chart.y + chart.height - value * chart.height * 0.9;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = `rgba(${chart.color}, ${0.8 + chart.hoverProgress * 0.2})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      });
+
+      // Draw and update data tables
+      dataTables.forEach((table) => {
+        const rowHeight = 22;
+        const padding = 12;
+        const tableWidth = 180;
+        const tableHeight = table.rows.length * rowHeight + padding * 2;
+
+        // Check hover
+        table.isHovered =
+          mouseRef.current.x >= table.x &&
+          mouseRef.current.x <= table.x + tableWidth &&
+          mouseRef.current.y >= table.y &&
+          mouseRef.current.y <= table.y + tableHeight;
+
+        // Smooth hover transition
+        if (table.isHovered) {
+          table.hoverProgress = Math.min(1, table.hoverProgress + 0.06);
+        } else {
+          table.hoverProgress = Math.max(0, table.hoverProgress - 0.04);
+        }
+
+        // Subtle drift animation
+        table.drift.x += (Math.random() - 0.5) * 0.15;
+        table.drift.y += (Math.random() - 0.5) * 0.15;
+        table.drift.x *= 0.95;
+        table.drift.y *= 0.95;
+        table.drift.x = Math.max(-3, Math.min(3, table.drift.x));
+        table.drift.y = Math.max(-3, Math.min(3, table.drift.y));
+
+        const displayX = table.x + table.drift.x;
+        const displayY = table.y + table.drift.y;
+
+        table.opacity = table.baseOpacity + table.hoverProgress * 0.2;
+
+        // Draw background
+        ctx.fillStyle = `rgba(12, 16, 24, ${table.opacity * 2.5})`;
+        ctx.beginPath();
+        ctx.roundRect(displayX, displayY, tableWidth, tableHeight, 10);
+        ctx.fill();
+
+        // Draw border
+        ctx.strokeStyle = `rgba(100, 150, 200, ${table.opacity * 1.2 + table.hoverProgress * 0.25})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw rows
+        ctx.font = '600 11px "JetBrains Mono", "SF Mono", monospace';
+        table.rows.forEach((row, i) => {
+          const rowY = displayY + padding + i * rowHeight + 14;
+          
+          // Label
+          ctx.fillStyle = `rgba(200, 210, 230, ${table.opacity * 4})`;
+          ctx.fillText(row.label, displayX + padding, rowY);
+
+          // Value
+          ctx.textAlign = 'right';
+          ctx.fillStyle = `rgba(220, 230, 245, ${table.opacity * 4.5})`;
+          ctx.fillText(row.value, displayX + tableWidth - padding - 45, rowY);
+
+          // Change percentage
+          const changeColor = row.change >= 0 ? '74, 222, 128' : '248, 113, 113';
+          ctx.fillStyle = `rgba(${changeColor}, ${table.opacity * 4 + table.hoverProgress * 0.5})`;
+          const changeText = row.change >= 0 ? `+${row.change.toFixed(1)}%` : `${row.change.toFixed(1)}%`;
+          ctx.fillText(changeText, displayX + tableWidth - padding, rowY);
+          ctx.textAlign = 'left';
+        });
+      });
 
       // Draw and update candlesticks
       candles.forEach((candle) => {
