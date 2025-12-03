@@ -79,15 +79,16 @@ const baseStore: StateCreator<AuthState> = (set, get) => ({
   },
 });
 
-const persistedStore = persist(baseStore, {
-  name: 'investor-pro-auth',
-  partialize: (state) => ({
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-  }),
-});
-
-export const useAuthStore = create<AuthState>()(
-  isDevPreviewMode ? baseStore : persistedStore
-);
+// Create the store with or without persistence based on dev mode
+export const useAuthStore = isDevPreviewMode
+  ? create<AuthState>()(baseStore)
+  : create<AuthState>()(
+      persist(baseStore, {
+        name: 'investor-pro-auth',
+        partialize: (state) => ({
+          user: state.user,
+          isAuthenticated: state.isAuthenticated,
+        }),
+      })
+    );
 
