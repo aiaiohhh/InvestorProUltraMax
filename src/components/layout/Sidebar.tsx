@@ -16,7 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Menu
+  Menu,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { clsx } from 'clsx';
@@ -24,6 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/insights', label: 'AI Insights', icon: Brain, isNew: true },
   { href: '/portfolio', label: 'Portfolio', icon: Briefcase },
   { href: '/research', label: 'Research', icon: Search },
   { href: '/watchlist', label: 'Watchlist', icon: Eye },
@@ -106,6 +109,7 @@ export function Sidebar() {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const hasNewBadge = 'isNew' in item && item.isNew;
             
             return (
               <li key={item.href}>
@@ -116,7 +120,8 @@ export function Sidebar() {
                     'group relative',
                     isActive
                       ? 'bg-electric-cyan/10 text-electric-cyan'
-                      : 'text-white/60 hover:text-white hover:bg-midnight-700/50'
+                      : 'text-white/60 hover:text-white hover:bg-midnight-700/50',
+                    hasNewBadge && !isActive && 'bg-gradient-to-r from-electric-purple/10 to-transparent'
                   )}
                 >
                   {isActive && (
@@ -124,16 +129,30 @@ export function Sidebar() {
                   )}
                   <Icon className={clsx(
                     'w-5 h-5 flex-shrink-0',
-                    isActive && 'drop-shadow-[0_0_8px_rgba(0,217,255,0.5)]'
+                    isActive && 'drop-shadow-[0_0_8px_rgba(0,217,255,0.5)]',
+                    hasNewBadge && !isActive && 'text-electric-purple'
                   )} />
                   {sidebarOpen && (
-                    <span className="font-medium text-sm">{item.label}</span>
+                    <span className="font-medium text-sm flex-1">{item.label}</span>
+                  )}
+                  {sidebarOpen && hasNewBadge && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-electric-purple/20 text-electric-purple">
+                      NEW
+                    </span>
+                  )}
+                  {!sidebarOpen && hasNewBadge && (
+                    <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-electric-purple" />
                   )}
                   {!sidebarOpen && (
                     <div className="absolute left-full ml-2 px-2 py-1 bg-midnight-700 text-white text-sm rounded 
                                     opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all
-                                    whitespace-nowrap z-50 border border-midnight-500">
+                                    whitespace-nowrap z-50 border border-midnight-500 flex items-center gap-2">
                       {item.label}
+                      {hasNewBadge && (
+                        <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-electric-purple/20 text-electric-purple">
+                          NEW
+                        </span>
+                      )}
                     </div>
                   )}
                 </Link>

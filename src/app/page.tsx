@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { LandingPage } from '@/components/landing/LandingPage';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -12,6 +12,7 @@ import { HoldingsTable } from '@/components/dashboard/HoldingsTable';
 import { TopMovers } from '@/components/dashboard/TopMovers';
 import { NewsFeed } from '@/components/dashboard/NewsFeed';
 import { motion } from 'framer-motion';
+import { isDevPreviewMode, previewEmail, previewPassword } from '@/config/authConfig';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -32,6 +33,9 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [isHydrated, setIsHydrated] = useState(false);
+  const autoLoginAttempted = useRef(false);
+  const devModeEnabled = isDevPreviewMode;
+  const allowSignup = devModeEnabled;
 
   // Handle hydration
   useEffect(() => {
@@ -44,18 +48,27 @@ export default function HomePage() {
   };
 
   const handleSignUp = () => {
-    setAuthMode('signup');
+    setAuthMode(allowSignup ? 'signup' : 'login');
     setShowAuthModal(true);
   };
 
   const handleAuth = async (email: string, password: string, name?: string) => {
-    if (authMode === 'login') {
-      await login(email, password);
-    } else {
-      await signup(email, password, name || 'User');
+    const success = authMode === 'login'
+      ? await login(email, password)
+      : await signup(email, password, name || 'User');
+
+    if (success) {
+      setShowAuthModal(false);
     }
-    setShowAuthModal(false);
+
+    return success;
   };
+
+  useEffect(() => {
+    if (!devModeEnabled || autoLoginAttempted.current || isAuthenticated) return;
+    autoLoginAttempted.current = true;
+    void login(previewEmail, previewPassword);
+  }, [devModeEnabled, isAuthenticated, login]);
 
   // Show loading state during hydration
   if (!isHydrated) {

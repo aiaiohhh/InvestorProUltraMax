@@ -137,14 +137,23 @@ src/
 
 ## Environment Variables
 
-Create a `.env.local` file for API keys (when integrating real APIs):
+Create a `.env.local` file for API keys (when integrating real APIs) and preview access controls:
 
 ```env
+NEXT_PUBLIC_DEV_MODE=true          # Disable password prompts locally
+NEXT_PUBLIC_PREVIEW_EMAIL=dev@ipum.test
+NEXT_PUBLIC_PREVIEW_PASSWORD=ascent123
+NEXT_PUBLIC_PREVIEW_NAME=Investor Preview User
 NEXT_PUBLIC_ALPHA_VANTAGE_KEY=your_key_here
 NEXT_PUBLIC_COINGECKO_KEY=your_key_here
 DATABASE_URL=your_database_url
 NEXTAUTH_SECRET=your_secret
 ```
+
+- Set `NEXT_PUBLIC_DEV_MODE` to `false` (or remove it) for any live/production deployment. The app will then:
+  - Require HTTP Basic Auth using the preview email/password before serving any page.
+  - Keep the in-app dashboard locked behind the same credentials.
+- Leave `NEXT_PUBLIC_DEV_MODE=true` during local development to auto-load the preview account without any prompts.
 
 ## License
 

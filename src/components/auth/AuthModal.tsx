@@ -4,13 +4,19 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff, Zap, Github, Chrome } from 'lucide-react';
 import { clsx } from 'clsx';
+import {
+  isDevPreviewMode,
+  previewCredentialsLabel,
+  previewEmail,
+  previewPassword,
+} from '@/config/authConfig';
 
 interface AuthModalProps {
   isOpen: boolean;
   mode: 'login' | 'signup';
   onClose: () => void;
   onModeChange: (mode: 'login' | 'signup') => void;
-  onAuth: (email: string, password: string, name?: string) => void;
+  onAuth: (email: string, password: string, name?: string) => Promise<boolean>;
 }
 
 export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthModalProps) {
@@ -20,14 +26,13 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const allowSignup = isDevPreviewMode;
+  const allowSocialAuth = isDevPreviewMode;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Basic validation
     if (!email || !password) {
@@ -36,8 +41,14 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
       return;
     }
 
-    if (mode === 'signup' && !name) {
+    if (mode === 'signup' && allowSignup && !name) {
       setError('Please enter your name');
+      setIsLoading(false);
+      return;
+    }
+
+    if (mode === 'signup' && !allowSignup) {
+      setError('Sign ups are disabled for this preview.');
       setIsLoading(false);
       return;
     }
@@ -48,12 +59,22 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
       return;
     }
 
-    onAuth(email, password, mode === 'signup' ? name : undefined);
+    const success = await onAuth(email, password, mode === 'signup' ? name : undefined);
+
+    if (!success) {
+      setError('Invalid credentials. Use the preview username/password to continue.');
+      setIsLoading(false);
+      return;
+    }
+
+    setEmail('');
+    setPassword('');
+    setName('');
     setIsLoading(false);
   };
 
   const handleSocialAuth = (provider: string) => {
-    // Simulate social auth
+    if (!allowSocialAuth) return;
     onAuth(`${provider}@example.com`, 'social-auth', `${provider} User`);
   };
 
@@ -110,17 +131,27 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
             {/* Social Auth Buttons */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
+                type="button"
+                disabled={!allowSocialAuth}
                 onClick={() => handleSocialAuth('google')}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-midnight-700 
-                           rounded-lg border border-midnight-500 hover:bg-midnight-600 transition-colors"
+                className={clsx(
+                  'flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-midnight-500 transition-colors',
+                  'bg-midnight-700 hover:bg-midnight-600',
+                  !allowSocialAuth && 'opacity-40 cursor-not-allowed hover:bg-midnight-700'
+                )}
               >
                 <Chrome className="w-5 h-5 text-white/70" />
                 <span className="text-sm font-medium text-white/80">Google</span>
               </button>
               <button
+                type="button"
+                disabled={!allowSocialAuth}
                 onClick={() => handleSocialAuth('github')}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-midnight-700 
-                           rounded-lg border border-midnight-500 hover:bg-midnight-600 transition-colors"
+                className={clsx(
+                  'flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-midnight-500 transition-colors',
+                  'bg-midnight-700 hover:bg-midnight-600',
+                  !allowSocialAuth && 'opacity-40 cursor-not-allowed hover:bg-midnight-700'
+                )}
               >
                 <Github className="w-5 h-5 text-white/70" />
                 <span className="text-sm font-medium text-white/80">GitHub</span>
@@ -132,13 +163,15 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
                 <div className="w-full border-t border-midnight-500" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-midnight-800 text-white/40">or continue with email</span>
+                <span className="px-2 bg-midnight-800 text-white/40">
+                  {allowSocialAuth ? 'or continue with email' : 'Enter the preview credentials'}
+                </span>
               </div>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'signup' && (
+              {mode === 'signup' && allowSignup && (
                 <div>
                   <label className="block text-sm text-white/60 mb-2">Full Name</label>
                   <div className="relative">
@@ -210,6 +243,14 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
                 </div>
               )}
 
+              {!allowSocialAuth && (
+                <div className="p-3 bg-midnight-700 border border-midnight-500 rounded-lg text-sm text-white/60">
+                  Preview access is limited. Use{' '}
+                  <span className="font-mono text-white">{previewCredentialsLabel}</span>
+                  {' '}to sign in.
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -225,22 +266,34 @@ export function AuthModal({ isOpen, mode, onClose, onModeChange, onAuth }: AuthM
             </form>
 
             {/* Footer */}
-            <p className="mt-6 text-center text-sm text-white/50">
-              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-              <button
-                onClick={() => onModeChange(mode === 'login' ? 'signup' : 'login')}
-                className="text-electric-cyan hover:underline font-medium"
-              >
-                {mode === 'login' ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
+            {allowSignup && (
+              <>
+                <p className="mt-6 text-center text-sm text-white/50">
+                  {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                  <button
+                    type="button"
+                    onClick={() => onModeChange(mode === 'login' ? 'signup' : 'login')}
+                    className="text-electric-cyan hover:underline font-medium"
+                  >
+                    {mode === 'login' ? 'Sign up' : 'Sign in'}
+                  </button>
+                </p>
 
-            {mode === 'signup' && (
-              <p className="mt-4 text-center text-xs text-white/30">
-                By signing up, you agree to our{' '}
-                <a href="#" className="text-white/50 hover:underline">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="text-white/50 hover:underline">Privacy Policy</a>
+                {mode === 'signup' && (
+                  <p className="mt-4 text-center text-xs text-white/30">
+                    By signing up, you agree to our{' '}
+                    <a href="#" className="text-white/50 hover:underline">Terms of Service</a>
+                    {' '}and{' '}
+                    <a href="#" className="text-white/50 hover:underline">Privacy Policy</a>
+                  </p>
+                )}
+              </>
+            )}
+
+            {!allowSocialAuth && (
+              <p className="mt-4 text-center text-xs text-white/40">
+                Username: <span className="font-mono text-white">{previewEmail}</span> · Password:{' '}
+                <span className="font-mono text-white">{previewPassword}</span>
               </p>
             )}
           </div>
